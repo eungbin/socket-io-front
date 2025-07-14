@@ -109,14 +109,19 @@ function App() {
         {messages.length === 0 ? (
           <EmptyMessage>메시지가 없습니다.</EmptyMessage>
         ) : (
-          messages.map((msg) => (
-            <MessageWrapper key={msg.id} isOwn={msg.isOwn}>
-              <MessageItem isOwn={msg.isOwn}>
-                <MessageSender>{msg.sender}</MessageSender>
-                <MessageText>{msg.text}</MessageText>
-              </MessageItem>
-            </MessageWrapper>
-          ))
+          messages.map((msg, idx) => {
+            // 연속된 상대방 메시지 중 첫 번째에만 이름 표시
+            const prevMsg = messages[idx - 1];
+            const showSender = !msg.isOwn && (!prevMsg || prevMsg.sender !== msg.sender || prevMsg.isOwn);
+            return (
+              <MessageWrapper key={msg.id} isOwn={msg.isOwn}>
+                {showSender && <MessageSender>{msg.sender}</MessageSender>}
+                <MessageItem isOwn={msg.isOwn}>
+                  <MessageText>{msg.text}</MessageText>
+                </MessageItem>
+              </MessageWrapper>
+            )
+          })
         )}
       </MessageList>
       <InputRow>
@@ -191,7 +196,7 @@ const EnterButton = styled.button`
 
 const ChatContainer = styled.div`
   max-width: 400px;
-  height: 100vh;
+  height: 600px;
   margin: 0 auto;
   background: #fff;
   display: flex;
@@ -240,7 +245,8 @@ const EmptyMessage = styled.div`
 
 const MessageWrapper = styled.div<{ isOwn: boolean }>`
   display: flex;
-  justify-content: ${props => props.isOwn ? 'flex-end' : 'flex-start'};
+  flex-direction: column;
+  align-items: ${props => props.isOwn ? 'flex-end' : 'flex-start'};
   margin: 8px 0;
 `;
 
@@ -249,7 +255,7 @@ const MessageItem = styled.div<{ isOwn: boolean }>`
   padding: 12px 16px;
   background: ${props => props.isOwn ? '#fee500' : '#fff'};
   color: #333;
-  border-radius: 18px;
+  border-radius: 10px;
   word-wrap: break-word;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   position: relative;
@@ -260,10 +266,11 @@ const MessageItem = styled.div<{ isOwn: boolean }>`
 `;
 
 const MessageSender = styled.div`
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   margin-bottom: 4px;
   color: #666;
+  text-align: left;
 `;
 
 const MessageText = styled.div`
