@@ -199,6 +199,7 @@ const MessageText = styled.div`
   font-size: 15px;
   line-height: 1.4;
   word-break: break-word;
+  text-align: left;
 `;
 
 const InputRow = styled.div`
