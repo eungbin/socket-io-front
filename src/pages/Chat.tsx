@@ -9,21 +9,19 @@ interface Message {
   isOwn: boolean;
 }
 
-interface ChatPageProps {
-  username: string;
-}
-
-function ChatPage({ username }: ChatPageProps) {
+function ChatPage() {
+  const userId = sessionStorage.getItem('userId') || '';
+  const userName = sessionStorage.getItem('userName') || '';
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const messageListRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!username) {
+    if (!userId || !userName) {
       navigate('/');
     }
-  }, [username, navigate]);
+  }, [userId, userName, navigate]);
 
   // 새로운 메시지가 추가될 때마다 스크롤을 맨 아래로 이동
   useEffect(() => {
@@ -37,7 +35,7 @@ function ChatPage({ username }: ChatPageProps) {
     const newMessage: Message = {
       id: Date.now().toString(),
       text: input,
-      sender: username,
+      sender: userName,
       isOwn: true
     };
     setMessages([...messages, newMessage]);
@@ -76,7 +74,7 @@ function ChatPage({ username }: ChatPageProps) {
     <ChatContainer>
       <ChatHeader>
         <ChatTitle>채팅방</ChatTitle>
-        <CurrentUser>현재 사용자: {username}</CurrentUser>
+        <CurrentUser>현재 사용자: {userName} ({userId})</CurrentUser>
       </ChatHeader>
       <MessageList ref={messageListRef}>
         {messages.length === 0 ? (
