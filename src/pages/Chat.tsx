@@ -1,13 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { io, Socket } from 'socket.io-client';
+
+interface Sender {
+  id: string;
+  name: string;
+}
 
 interface Message {
   id: string;
   text: string;
-  sender: string;
+  sender: Sender;
   isOwn: boolean;
 }
+
+// 소켓 서버 주소를 실제 환경에 맞게 수정하세요
+const SOCKET_SERVER_URL = 'http://localhost:3001';
 
 function ChatPage() {
   const userId = sessionStorage.getItem('userId') || '';
@@ -15,6 +24,7 @@ function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const messageListRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,7 +33,42 @@ function ChatPage() {
     }
   }, [userId, userName, navigate]);
 
-  // 새로운 메시지가 추가될 때마다 스크롤을 맨 아래로 이동
+  useEffect(() => {
+    // 소켓 연결
+    const socket = io(SOCKET_SERVER_URL, {
+      transports: ['websocket'],
+      query: { userId, userName },
+    });
+    socketRef.current = socket;
+
+    // 서버로부터 메시지 수신
+    socket.on('receive_message', (data: { id: string; text: string; sender: Sender }) => {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: data.id,
+          text: data.text,
+          sender: data.sender,
+          isOwn: data.sender.id === userId,
+        },
+      ]);
+    });
+
+    // (선택) 서버에서 이전 메시지 목록을 받을 경우
+    socket.on('chat_history', (history: { id: string; text: string; sender: Sender }[]) => {
+      setMessages(
+        history.map(msg => ({
+          ...msg,
+          isOwn: msg.sender.id === userId,
+        }))
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [userId, userName]);
+
   useEffect(() => {
     if (messageListRef.current) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
@@ -31,14 +76,17 @@ function ChatPage() {
   }, [messages]);
 
   const handleSend = () => {
-    if (input.trim() === '') return;
-    const newMessage: Message = {
+    if (input.trim() === '' || !socketRef.current) return;
+    const msgData = {
       id: Date.now().toString(),
       text: input,
-      sender: userName,
-      isOwn: true
+      sender: {
+        id: userId,
+        name: userName,
+      },
     };
-    setMessages([...messages, newMessage]);
+    // 서버로 메시지 전송
+    socketRef.current.emit('send_message', msgData);
     setInput('');
   };
 
@@ -46,28 +94,6 @@ function ChatPage() {
     if (e.key === 'Enter') {
       handleSend();
     }
-  };
-
-  // 샘플 사용자들 (실제로는 서버에서 받아올 데이터)
-  const sampleUsers = ['김철수', '이영희', '박민수', '정수진'];
-
-  const addSampleMessage = () => {
-    const randomUser = sampleUsers[Math.floor(Math.random() * sampleUsers.length)];
-    const sampleMessages = [
-      '안녕하세요!',
-      '오늘 날씨가 좋네요',
-      '프로젝트 진행상황은 어떠신가요?',
-      '회의 시간 조율해주세요',
-      '좋은 아이디어네요!'
-    ];
-    const randomMessage = sampleMessages[Math.floor(Math.random() * sampleMessages.length)];
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: randomMessage,
-      sender: randomUser,
-      isOwn: false
-    };
-    setMessages([...messages, newMessage]);
   };
 
   return (
@@ -81,12 +107,11 @@ function ChatPage() {
           <EmptyMessage>메시지가 없습니다.</EmptyMessage>
         ) : (
           messages.map((msg, idx) => {
-            // 연속된 상대방 메시지 중 첫 번째에만 이름 표시
             const prevMsg = messages[idx - 1];
-            const showSender = !msg.isOwn && (!prevMsg || prevMsg.sender !== msg.sender || prevMsg.isOwn);
+            const showSender = !msg.isOwn && (!prevMsg || prevMsg.sender.id !== msg.sender.id || prevMsg.isOwn);
             return (
               <MessageWrapper key={msg.id} isOwn={msg.isOwn}>
-                {showSender && <MessageSender>{msg.sender}</MessageSender>}
+                {showSender && <MessageSender>{msg.sender.name}</MessageSender>}
                 <MessageItem isOwn={msg.isOwn}>
                   <MessageText>{msg.text}</MessageText>
                 </MessageItem>
@@ -107,9 +132,6 @@ function ChatPage() {
           전송
         </SendButton>
       </InputRow>
-      <SampleButton onClick={addSampleMessage}>
-        샘플 메시지 추가
-      </SampleButton>
     </ChatContainer>
   );
 }
@@ -239,21 +261,6 @@ const SendButton = styled.button`
     background: #e0e0e0;
     color: #999;
     cursor: not-allowed;
-  }
-`;
-
-const SampleButton = styled.button`
-  margin: 0 20px 16px 20px;
-  padding: 10px;
-  border-radius: 20px;
-  border: 1px solid #e0e0e0;
-  background: #fff;
-  color: #666;
-  cursor: pointer;
-  font-size: 12px;
-  
-  &:hover {
-    background: #f8f9fa;
   }
 `;
 
